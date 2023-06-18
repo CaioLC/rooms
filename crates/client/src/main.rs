@@ -3,7 +3,7 @@ extern crate log;
 
 use std::{time::Instant, io::stdin};
 
-use common::{lobby_address, client_address, DataType};
+use common::{lobby_address, client_address, DataType, LobbyEvents};
 use bincode::{deserialize, serialize};
 use laminar::{Socket, Packet, SocketEvent};
 fn main() {
@@ -22,28 +22,34 @@ fn main() {
         s_buffer.clear();
         stdin.read_line(&mut s_buffer).unwrap();
         let line = s_buffer.replace(|x| x == '\n' || x == '\r', "");
-
+        
+        let message = LobbyEvents::from_string(&line);
         socket.send(Packet::reliable_unordered(
             server,
-            line.clone().into_bytes(),
+            serialize(&message).unwrap()
         )).unwrap();
+        
+        if &line == "Bye!" {
+                    break;
+                }
 
-        socket.manual_poll(Instant::now());
-
-        if line == "Bye!" {
-            break;
-        }
-
+        socket.manual_poll(Instant::now());        
         match socket.recv() {
             Some(SocketEvent::Packet(packet)) => {
                 if packet.addr() == server {
-                    println!("Server sent: {}", String::from_utf8_lossy(packet.payload()));
+                    let payload = packet.payload();
+                    let event: LobbyEvents = deserialize(payload).unwrap();
+                    match event {
+                        LobbyEvents::Message(msg) => {
+                            println!("Server sent: {msg}");
+                        }
+                        _ => {}
+                    }
                 } else {
                     println!("Unknown sender.");
                 }
             }
-            Some(SocketEvent::Timeout(_)) => {}
-            _ => println!("Silence.."),
+            _ => {}
         }
     }
 }
