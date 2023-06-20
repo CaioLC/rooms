@@ -4,10 +4,15 @@ extern crate log;
 use std::net::SocketAddr;
 use serde_derive::{Deserialize, Serialize};
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+/// GAME ///
+pub enum GameState {
+    Lobby,
+    Room(usize, usize), // relay_id, game_id
+    Quit,
 }
 
+
+/// NETWORKING ///
 /// The socket address of where the server is located.
 const LOBBY_ADDR: &str = "127.0.0.1:12345";
 // The client address from where the data is sent.
@@ -36,7 +41,6 @@ pub enum LobbyEvents {
 impl LobbyEvents {
     pub fn from_string(cmd: &String) -> LobbyEvents {
         if cmd == "lobby -h" || cmd == "lobby --help" {
-            info!("Requested help");
             return LobbyEvents::ClientRequestHelp;
         }
         if cmd == "lobby -l" || cmd == "lobby --list" {
@@ -46,6 +50,7 @@ impl LobbyEvents {
             return LobbyEvents::ClientCreateGame;
         }
         if cmd.starts_with("lobby -j") || cmd.starts_with("lobby --join") {
+            info!("Requested join");
             let mut parse_command = cmd.split_whitespace();
             let _ = parse_command.next().unwrap();
             let _ = parse_command.next().unwrap();

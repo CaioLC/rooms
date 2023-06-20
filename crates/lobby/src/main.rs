@@ -37,7 +37,7 @@ fn main() {
                         LobbyEvents::ClientRequestHelp => {
                             let response = serialize(
                                 &LobbyEvents::Message(
-                                    format!("Commands available: \nlobby --help: display this help message.\nlobby --list: list games available.\n lobby --newgame: create new game.\nWrite `Bye!` to quit."))
+                                    format!("Commands available: \nlobby --help: display this help message.\nlobby --list: list games available.\nlobby --newgame: create new game.\nWrite `Bye!` to quit."))
                             ).unwrap();
                             sender
                                 .send(Packet::reliable_unordered(
@@ -53,6 +53,7 @@ fn main() {
                         LobbyEvents::RelayDisconnected => todo!(),
                         LobbyEvents::KeepAlive => {},
                         LobbyEvents::Message(msg) => {
+                            dbg!(&msg);
                             if msg == "Bye!" {
                                 break;
                             }
