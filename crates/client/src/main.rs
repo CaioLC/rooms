@@ -1,11 +1,11 @@
 #[macro_use]
 extern crate log;
 
-use std::{time::Instant, io::stdin, thread};
+use std::{io::stdin, thread, time::Instant};
 
-use common::{lobby_address, client_address, DataType, LobbyEvents};
 use bincode::{deserialize, serialize};
-use laminar::{Socket, Packet, SocketEvent};
+use common::{client_address, lobby_address, DataType, LobbyEvents};
+use laminar::{Packet, Socket, SocketEvent};
 
 mod app;
 use app::Client;
@@ -15,9 +15,9 @@ fn main() {
     let mut socket = Socket::bind(client_address()).unwrap();
     let (sender, receiver) = (socket.get_packet_sender(), socket.get_event_receiver());
     let _thread = thread::spawn(move || socket.start_polling());
-    
+
     /* setup client */
-    let mut client = Client::new(sender, receiver);
+    let mut client = Client::new("Caio".to_string(), sender, receiver);
     println!("Type a message and press Enter to send. Send `Bye!` to quit.");
     client.run();
 }

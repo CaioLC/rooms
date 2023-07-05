@@ -562,7 +562,14 @@ dependencies = [
 name = "relay"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "common",
+ "laminar",
+ "log",
+ "serde",
+ "serde_derive",
+ "simple_logger",
+ "smol",
 ]
 
 [[package]]

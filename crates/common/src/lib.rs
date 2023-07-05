@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate log;
 
-use std::net::SocketAddr;
 use serde_derive::{Deserialize, Serialize};
+use std::net::SocketAddr;
 
 /// GAME ///
 pub enum GameState {
@@ -10,7 +10,6 @@ pub enum GameState {
     Room(usize, usize), // relay_id, game_id
     Quit,
 }
-
 
 /// NETWORKING ///
 /// The socket address of where the server is located.
@@ -31,8 +30,14 @@ pub enum LobbyEvents {
     ClientRequestGameList,
     ClientRequestHelp,
     ClientCreateGame,
-    ClientJoinGame{relay_id: u32, game_id: u32},
-    RelayConnected,
+    ClientJoinGame {
+        relay_id: u32,
+        game_id: u32,
+    },
+    RelayInitialized {
+        relay_id: u32,
+        relay_addr: SocketAddr,
+    },
     RelayDisconnected,
     KeepAlive,
     Message(String),
@@ -62,11 +67,13 @@ impl LobbyEvents {
                     let game_id = game.trim().parse().unwrap();
                     LobbyEvents::ClientJoinGame { relay_id, game_id }
                 }
-                _ => LobbyEvents::Message(format!("ERR: failed to parse relay and game ID from command: {cmd}"))
+                _ => LobbyEvents::Message(format!(
+                    "ERR: failed to parse relay and game ID from command: {cmd}"
+                )),
             };
-            return event
+            return event;
         }
-        return LobbyEvents::Message(cmd.into());
+        LobbyEvents::Message(cmd.into())
     }
 }
 

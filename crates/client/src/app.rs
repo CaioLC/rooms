@@ -1,25 +1,36 @@
-use std::{net::SocketAddr, io::stdin, time::Instant, thread};
+use std::time::Duration;
+use std::{io::stdin, net::SocketAddr, thread, time::Instant};
 
-use bincode::{serialize, deserialize};
-use common::{GameState, client_address, lobby_address, LobbyEvents};
-use laminar::{Socket, Packet, SocketEvent};
-use crossbeam::channel::{Sender, Receiver};
+use bincode::{deserialize, serialize};
+use common::{client_address, lobby_address, GameState, LobbyEvents};
+use crossbeam::channel::{Receiver, Sender};
+use laminar::{Packet, Socket, SocketEvent};
 
 pub struct Client {
+    pub username: String,
     pub game_state: GameState,
     pub sender: Sender<Packet>,
     pub receiver: Receiver<SocketEvent>,
     pub lobby_addr: SocketAddr,
     pub relay_addr: Option<SocketAddr>,
+    pub timeout: Duration,
 }
 
 impl Client {
-    pub fn new(sender: Sender<Packet>, receiver: Receiver<SocketEvent>) -> Self {
+    pub fn new(username: String, sender: Sender<Packet>, receiver: Receiver<SocketEvent>) -> Self {
         info!("Client started");
         let lobby_addr = lobby_address();
-        Client { game_state: GameState::Lobby, sender, receiver, lobby_addr, relay_addr: None }
+        Client {
+            username,
+            game_state: GameState::Lobby,
+            sender,
+            receiver,
+            lobby_addr,
+            relay_addr: None,
+            timeout: Duration::from_millis(200),
+        }
     }
-    
+
     pub fn run(&mut self) {
         // TODO: do I need to sleep here?
         loop {
@@ -32,40 +43,34 @@ impl Client {
     }
 
     fn lobby_interaction(&mut self) {
-        while let Ok(event) = self.receiver.try_recv() {
-            match event {
-                SocketEvent::Packet(packet) => {
-                    if packet.addr() == self.lobby_addr {
-                        let payload = packet.payload();
-                        let event: LobbyEvents = deserialize(payload).unwrap();
-                        match event {
-                            LobbyEvents::Message(msg) => {
-                                println!("Server sent: {msg}");
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        println!("Unknown sender.");
-                    }
-                }
-                _ => {}
-            }
-        }    
         let stdin = stdin();
         let mut s_buffer = String::new();
 
         s_buffer.clear();
         stdin.read_line(&mut s_buffer).unwrap();
         let line = s_buffer.replace(|x| x == '\n' || x == '\r', "");
-        
+
         let message = LobbyEvents::from_string(&line);
-        dbg!(&message);
-        self.sender.send(Packet::reliable_unordered(
-            self.lobby_addr,
-            serialize(&message).unwrap()
-        )).unwrap();
+        self.sender
+            .send(Packet::reliable_unordered(
+                self.lobby_addr,
+                serialize(&message).unwrap(),
+            ))
+            .unwrap();
 
-
+        while let Ok(event) = self.receiver.recv_timeout(self.timeout) {
+            if let SocketEvent::Packet(packet) = event {
+                if packet.addr() == self.lobby_addr {
+                    let payload = packet.payload();
+                    let event: LobbyEvents = deserialize(payload).unwrap();
+                    if let LobbyEvents::Message(msg) = event {
+                        println!("server sent: {msg}");
+                    }
+                } else {
+                    println!("Unknown sender.");
+                }
+            }
+        }
     }
 
     fn room_interaction(&mut self) {

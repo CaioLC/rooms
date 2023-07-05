@@ -4,11 +4,11 @@
 //! 3. serialize data to send and deserialize when received.
 #[macro_use]
 extern crate log;
-use log::LevelFilter;
-use simple_logger::SimpleLogger;
-use std::{time::Instant, thread};
 use bincode::{deserialize, serialize};
 use laminar::{Packet, Socket, SocketEvent};
+use log::LevelFilter;
+use simple_logger::SimpleLogger;
+use std::{thread, time::Instant};
 
 use common::{lobby_address, DataType, LobbyEvents};
 
@@ -24,7 +24,10 @@ fn main() {
     // This will run an simple example with client and server communicating.
     info!("Lobby listening...");
     let mut lobby = Lobby::new();
-    let (sender, receiver) = (lobby.socket.get_packet_sender(), lobby.socket.get_event_receiver());
+    let (sender, receiver) = (
+        lobby.socket.get_packet_sender(),
+        lobby.socket.get_event_receiver(),
+    );
     let _thread = thread::spawn(move || lobby.socket.start_polling());
 
     loop {
@@ -35,23 +38,31 @@ fn main() {
                     let event: LobbyEvents = deserialize(payload).unwrap();
                     match event {
                         LobbyEvents::ClientRequestHelp => {
-                            let response = serialize(
-                                &LobbyEvents::Message(
-                                    format!("Commands available: \nlobby --help: display this help message.\nlobby --list: list games available.\nlobby --newgame: create new game.\nWrite `Bye!` to quit."))
-                            ).unwrap();
+                            let response = serialize(&LobbyEvents::Message(
+                                r#"Commands available: 
+lobby --help | lobby -h: display this help message.
+lobby --list | lobby -l: list games available.
+lobby --newgame | lobby -n: create new game.
+lobby --quit | lobby -q to quit."#
+                                    .to_string(),
+                            ))
+                            .unwrap();
                             sender
-                                .send(Packet::reliable_unordered(
-                                    packet.addr(),
-                                    response,
-                                ))
+                                .send(Packet::reliable_unordered(packet.addr(), response))
                                 .expect("This should send");
-                        },
-                        LobbyEvents::ClientRequestGameList => {println!("TODO: Show game list")}
-                        LobbyEvents::ClientCreateGame => {println!("TODO: Create game")}
-                        LobbyEvents::ClientJoinGame{relay_id, game_id} => {println!("TODO: joining game: {relay_id}--{game_id}")}
-                        LobbyEvents::RelayConnected => todo!(),
+                        }
+                        LobbyEvents::ClientRequestGameList => {
+                            println!("TODO: Show game list")
+                        }
+                        LobbyEvents::ClientCreateGame => {
+                            println!("TODO: Create game")
+                        }
+                        LobbyEvents::ClientJoinGame { relay_id, game_id } => {
+                            println!("TODO: joining game: {relay_id}--{game_id}")
+                        }
+                        LobbyEvents::RelayInitialized => todo!(),
                         LobbyEvents::RelayDisconnected => todo!(),
-                        LobbyEvents::KeepAlive => {},
+                        LobbyEvents::KeepAlive => {}
                         LobbyEvents::Message(msg) => {
                             dbg!(&msg);
                             if msg == "Bye!" {
@@ -60,14 +71,12 @@ fn main() {
                             let ip = packet.addr().ip();
                             info!("Received {:?} from {:?}", msg, ip);
 
-                            let response = serialize(&LobbyEvents::Message(format!("Copy that!"))).unwrap();
+                            let response =
+                                serialize(&LobbyEvents::Message(format!("Copy that!"))).unwrap();
                             sender
-                                .send(Packet::reliable_unordered(
-                                    packet.addr(),
-                                    response,
-                                ))
+                                .send(Packet::reliable_unordered(packet.addr(), response))
                                 .expect("This should send");
-                        },
+                        }
                     }
                 }
                 SocketEvent::Timeout(address) => {

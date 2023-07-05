@@ -1,19 +1,23 @@
-use std::{thread::{sleep, self}, time::Duration, net::SocketAddr};
+use std::{
+    net::SocketAddr,
+    thread::{self, sleep},
+    time::Duration,
+};
 
-use laminar::{Socket, Packet, SocketEvent};
 use common::lobby_address;
+use laminar::{Packet, Socket, SocketEvent};
 
 pub struct Lobby {
     pub socket: Socket,
-    pub server_rooms: Option<Vec<SocketAddr>>
+    pub server_rooms: Option<Vec<SocketAddr>>,
 }
 
 impl Lobby {
     pub fn new() -> Self {
         info!("Lobby started");
-        let address = Socket::bind(lobby_address()).unwrap();
+        let socket = Socket::bind(lobby_address()).unwrap();
         Lobby {
-            socket: address,
+            socket,
             server_rooms: None,
         }
     }
