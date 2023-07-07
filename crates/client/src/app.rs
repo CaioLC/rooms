@@ -35,36 +35,77 @@ impl Client {
         // TODO: do I need to sleep here?
         loop {
             match self.game_state {
-                GameState::Lobby => self.lobby_interaction(),
-                GameState::Room(_, _) => self.room_interaction(),
+                GameState::Lobby => self.lobby_loop(),
+                GameState::AwaitingRoom => self.await_room_loop(),
+                GameState::Room(_, _) => self.room_loop(),
                 GameState::Quit => self.quit(),
             }
         }
     }
 
-    fn lobby_interaction(&mut self) {
+    fn lobby_loop(&mut self) {
+        // check messages
+        while let Ok(event) = self.receiver.recv_timeout(self.timeout) {
+            if let SocketEvent::Packet(packet) = event {
+                if packet.addr() == self.lobby_addr {
+                    let payload = packet.payload();
+                    let event: LobbyEvents = deserialize(payload).unwrap();
+                    match event {
+                        LobbyEvents::Message(msg) => {
+                            println!("server sent: {msg}")
+                        },
+                        _ => {}
+                    }
+                } else {
+                    println!("Unknown sender.");
+                }
+            }
+        }
+
+        // parse cli
+        // TODO: this needs to be async.
         let stdin = stdin();
         let mut s_buffer = String::new();
-
         s_buffer.clear();
         stdin.read_line(&mut s_buffer).unwrap();
         let line = s_buffer.replace(|x| x == '\n' || x == '\r', "");
-
         let message = LobbyEvents::from_string(&line);
+
+        // send message
         self.sender
             .send(Packet::reliable_unordered(
                 self.lobby_addr,
                 serialize(&message).unwrap(),
             ))
             .unwrap();
+        
+        // if command is new game, update GameState.
+        if message == LobbyEvents::ClientCreateGame {
+            println!("Awaiting game creation. Send 'cancel' to abort.");
+            self.game_state = GameState::AwaitingRoom;
+        }
+    }
 
+    fn await_room_loop(&mut self) {
+        let stdin = stdin();
+        let mut s_buffer = String::new();
+        s_buffer.clear();
+        stdin.read_line(&mut s_buffer).unwrap();
+        let line = s_buffer.replace(|x| x == '\n' || x == '\r', "");
+        if line == "cancel".to_string() {
+            self.game_state = GameState::Lobby;
+            println!("returning to Lobby");
+            return
+        }
         while let Ok(event) = self.receiver.recv_timeout(self.timeout) {
             if let SocketEvent::Packet(packet) = event {
                 if packet.addr() == self.lobby_addr {
                     let payload = packet.payload();
                     let event: LobbyEvents = deserialize(payload).unwrap();
-                    if let LobbyEvents::Message(msg) = event {
-                        println!("server sent: {msg}");
+                    match event {
+                        LobbyEvents::RelayInitialized { relay_id, relay_addr } => update_game_state(self, relay_id, relay_addr),
+                        LobbyEvents::Message(msg) => info!("server sent: {msg}"),
+                        _ => {}
                     }
                 } else {
                     println!("Unknown sender.");
@@ -73,11 +114,15 @@ impl Client {
         }
     }
 
-    fn room_interaction(&mut self) {
+    fn room_loop(&mut self) {
         todo!()
     }
 
     fn quit(&mut self) {
         todo!()
     }
+}
+
+fn update_game_state(arg: &mut Client, relay_id: u32, relay_addr: SocketAddr) {
+    todo!()
 }

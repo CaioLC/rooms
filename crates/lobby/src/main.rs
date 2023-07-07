@@ -8,7 +8,7 @@ use bincode::{deserialize, serialize};
 use laminar::{Packet, Socket, SocketEvent};
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
-use std::{thread, time::Instant};
+use std::{thread, time::Instant, process::Command};
 
 use common::{lobby_address, DataType, LobbyEvents};
 
@@ -55,12 +55,33 @@ lobby --quit | lobby -q to quit."#
                             println!("TODO: Show game list")
                         }
                         LobbyEvents::ClientCreateGame => {
-                            println!("TODO: Create game")
+                            let id = match &lobby.server_rooms {
+                                Some(v) => v.len(),
+                                None => 0,
+                            }; 
+                            
+                            // NOTE: this will run relays in the same machine of the lobby.
+                            // Ideally we can spawn relays anywhere and have the lobby keep address records.
+                            let output = if cfg!(target_os = "windows") {
+                                Command::new("cmd")
+                                        .args(["/C", &format!("cargo run -p relay {id}")])
+                                        .output()
+                                        .expect("failed to execute process")
+                            } else {
+                                Command::new("sh")
+                                        .arg("-c")
+                                        .arg(format!("cargo run -p relay {id}"))
+                                        .output()
+                                        .expect("failed to execute process")
+                            };
+                            println!("{:?}", output);
                         }
                         LobbyEvents::ClientJoinGame { relay_id, game_id } => {
                             println!("TODO: joining game: {relay_id}--{game_id}")
                         }
-                        LobbyEvents::RelayInitialized => todo!(),
+                        LobbyEvents::RelayInitialized {relay_id, relay_addr} => {
+                            println!("Relay live at {relay_addr} with id {relay_id}");
+                        },
                         LobbyEvents::RelayDisconnected => todo!(),
                         LobbyEvents::KeepAlive => {}
                         LobbyEvents::Message(msg) => {
@@ -72,7 +93,7 @@ lobby --quit | lobby -q to quit."#
                             info!("Received {:?} from {:?}", msg, ip);
 
                             let response =
-                                serialize(&LobbyEvents::Message(format!("Copy that!"))).unwrap();
+                                serialize(&LobbyEvents::Message("Copy that!".to_string())).unwrap();
                             sender
                                 .send(Packet::reliable_unordered(packet.addr(), response))
                                 .expect("This should send");

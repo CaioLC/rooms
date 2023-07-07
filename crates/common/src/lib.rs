@@ -2,11 +2,12 @@
 extern crate log;
 
 use serde_derive::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{net::SocketAddr};
 
 /// GAME ///
 pub enum GameState {
     Lobby,
+    AwaitingRoom,
     Room(usize, usize), // relay_id, game_id
     Quit,
 }
@@ -25,7 +26,7 @@ pub fn lobby_address() -> SocketAddr {
     LOBBY_ADDR.parse().unwrap()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum LobbyEvents {
     ClientRequestGameList,
     ClientRequestHelp,
@@ -91,10 +92,4 @@ pub enum DataType {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
 }
